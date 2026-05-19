@@ -6,6 +6,10 @@ location the moment it's detected.
 
 Requirements:
     pip install mss pillow pytesseract pyautogui
+    Telegram is optional but recommended for instant notifications.
+    If you want Telegram alerts, also install requests:
+        pip install requests
+    And don't forget to set up your Telegram bot and chat ID in the config below!
 
 You also need Tesseract OCR installed on your system:
     Windows : https://github.com/UB-Mannheim/tesseract/wiki
@@ -19,42 +23,42 @@ import pytesseract
 import mss
 import mss.tools
 from PIL import Image
+import requests
 
 # ─────────────────────────────────────────────
 # CONFIGURATION — edit these values
 # ─────────────────────────────────────────────
 
 # Keywords to watch for (case-insensitive) — add as many as you want
-# KEYWORDS = [
-#     "glitch",
-#     "dream",
-#     "cyber",
-#     "glit",
-# ]
-
 KEYWORDS = [
-    "null",
-    "star",
-    "heav",
-    "rain",
+    "glitch",
+    "gli",
+    "dream",
+    "cyber",
+    "space",
+    "singularity",
+    "singular",
+    "sing",
+    "jester",
+    "jes"
 ]
 
 # Screen region to watch (in pixels)
 # Format: {"top": Y, "left": X, "width": W, "height": H}
 # Tip: run get_position.py first to find your coordinates
 WATCH_REGION = {
-    "top": 400,
-    "left": 800,
-    "width": 700,
-    "height": 400,
+    "top": 830,
+    "left": 450,
+    "width": 1000,
+    "height": 80,
 }
 
 # All coordinates to click when a keyword is found (clicked in order)
 # Add more rows to cover more positions, e.g. if the link can appear at different heights
 CLICK_TARGETS = [
-    (808, 860),   # slightly above
-    (808, 885),   # your main target
-    (808, 910),   # slightly below
+    (980, 860),   # slightly above
+    (980, 885),   # your main target
+    (980, 910),   # slightly below
 ]
 
 # Delay between each click in the list (in seconds)
@@ -71,12 +75,15 @@ COOLDOWN_AFTER_CLICK = 10
 # Optional: path to tesseract executable (Windows users usually need this)
 # pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
+TELEGRAM_TOKEN = "123" # Replace with your Telegram bot token
+TELEGRAM_CHAT_ID = "123" # Replace with your Telegram chat ID
+
 # ─────────────────────────────────────────────
 
 
 def capture_region(region: dict) -> Image.Image:
     """Take a screenshot of the specified region."""
-    with mss.mss() as sct:
+    with mss.MSS() as sct:
         raw = sct.grab(region)
         return Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")
 
@@ -88,6 +95,15 @@ def extract_text(image: Image.Image) -> str:
     image = image.resize((w * 2, h * 2), Image.LANCZOS)
     return pytesseract.image_to_string(image)
 
+def send_telegram(message: str):
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "text": message})
+        print("  📱 Telegram notification sent!")
+    except Exception as e:
+        print(f"  ⚠️ Telegram failed: {e}")
+
+send_telegram("🤖 Discord Watcher Bot is running!")
 
 def main():
     print("=" * 50)
@@ -100,6 +116,8 @@ def main():
     print("  Press Ctrl+C to stop.\n")
 
     last_click_time = 0
+
+    print(f"  👀 Watching for {KEYWORDS}...")
 
     while True:
         try:
@@ -121,6 +139,7 @@ def main():
             matched = next((kw for kw in KEYWORDS if kw.lower() in text_lower), None)
 
             if matched:
+                send_telegram(f"✅ Keyword '{matched}' detected!")
                 print(f"\n  ✅ Keyword '{matched}' detected! Clicking {len(CLICK_TARGETS)} positions...")
                 for i, target in enumerate(CLICK_TARGETS):
                     pyautogui.click(target)
@@ -128,8 +147,8 @@ def main():
                     if i < len(CLICK_TARGETS) - 1:
                         time.sleep(CLICK_DELAY)
                 last_click_time = time.time()
-            else:
-                print(f"\r  👀 Watching for {KEYWORDS}...              ", end="", flush=True)
+
+            # Removed the else case to reduce console spam when no keywords are found
 
             time.sleep(SCAN_INTERVAL)
 
